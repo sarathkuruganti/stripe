@@ -1,0 +1,195 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Localbites Payment</title>
+  <script src="https://js.stripe.com/v3/"></script>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      background-color: #f2f2f2;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      height: 100vh;
+      margin: 0;
+      flex-direction: column;
+    }
+
+    .container {
+      background-color: #ffffff;
+      padding: 40px;
+      border-radius: 10px;
+      box-shadow: 0 0 20px rgba(0, 0, 0, 0.1);
+      max-width: 400px;
+      width: 100%;
+      text-align: center;
+      position: relative;
+    }
+
+    h2 {
+      font-size: 28px;
+      color: #333333;
+      margin-bottom: 30px;
+    }
+
+    #card-element, #card-expiry-element, #card-cvc-element {
+      border: 1px solid #cccccc;
+      padding: 12px;
+      border-radius: 8px;
+      margin-bottom: 20px;
+    }
+
+    #submit {
+      background-color: #00796b;
+      color: white;
+      border: none;
+      padding: 12px 20px;
+      border-radius: 8px;
+      cursor: pointer;
+      width: 100%;
+      font-size: 16px;
+      font-weight: bold;
+    }
+
+    #submit:disabled {
+      background-color: #cccccc;
+    }
+
+    .hidden {
+      display: none;
+    }
+
+    .message-card {
+      padding: 20px;
+      border-radius: 10px;
+      box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
+      text-align: center;
+      margin-top: 20px;
+    }
+
+    .success-card {
+      background-color: #e0ffe0;
+      color: #00796b;
+    }
+
+    .failure-card {
+      background-color: #ffe0e0;
+      color: #d32f2f;
+    }
+
+    .powered-by {
+      margin-top: 20px;
+      font-size: 14px;
+      color: #777777;
+    }
+
+    .powered-by img {
+      height: 20px;
+      vertical-align: middle;
+      margin-left: 5px;
+    }
+
+    /* Loader Styles */
+    .loader {
+      border: 4px solid #f3f3f3;
+      border-radius: 50%;
+      border-top: 4px solid #3498db;
+      width: 30px;
+      height: 30px;
+      animation: spin 1s linear infinite;
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      z-index: 10;
+      display: none; /* Hidden initially */
+    }
+
+    @keyframes spin {
+      0% { transform: rotate(0deg); }
+      100% { transform: rotate(360deg); }
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="loader" id="loader"></div> <!-- Loader element -->
+    <h2>Localbites Payment</h2>
+    <form id="payment-form">
+      <div id="card-element"><!-- Card Number Element --></div>
+      <div id="card-expiry-element"><!-- Expiration Date Element --></div>
+      <div id="card-cvc-element"><!-- CVC Element --></div>
+      <button id="submit">Pay Now</button>
+    </form>
+
+    <!-- Success and Failure Cards -->
+    <div id="success-card" class="message-card success-card hidden">
+      <h3>Payment Successful!</h3>
+      <p>Thank you for your payment. Your transaction was successful.</p>
+    </div>
+
+    <div id="failure-card" class="message-card failure-card hidden">
+      <h3>Payment Failed</h3>
+      <p>Sorry, there was an issue with your payment. Please try again.</p>
+    </div>
+
+    <div class="powered-by">
+      Powered by <img src="stripe.png" alt="Stripe">
+    </div>
+  </div>
+
+  <script>
+    const stripe = Stripe('<%= publishableKey %>'); // Use the publishable key passed from the backend
+    const elements = stripe.elements();
+
+    // Create separate elements for card number, expiry date, and CVC
+    const cardElement = elements.create('cardNumber');
+    const cardExpiryElement = elements.create('cardExpiry');
+    const cardCvcElement = elements.create('cardCvc');
+
+    // Mount the elements to the corresponding divs
+    cardElement.mount('#card-element');
+    cardExpiryElement.mount('#card-expiry-element');
+    cardCvcElement.mount('#card-cvc-element');
+
+    const form = document.getElementById('payment-form');
+    const loader = document.getElementById('loader');
+    const submitButton = document.getElementById('submit');
+    const successCard = document.getElementById('success-card');
+    const failureCard = document.getElementById('failure-card');
+
+    form.addEventListener('submit', async (event) => {
+      event.preventDefault();
+      
+      // Show the loader and disable the submit button
+      loader.style.display = 'block';
+      submitButton.disabled = true;
+      
+      const { clientSecret } = await fetch('/create-payment-intent', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ amount: 1000 }), // Replace with actual amount
+      }).then(r => r.json());
+
+      const { paymentIntent, error } = await stripe.confirmCardPayment(clientSecret, {
+        payment_method: {
+          card: cardElement,
+        },
+      });
+
+      // Hide the loader and the form
+      loader.style.display = 'none';
+      form.classList.add('hidden');
+
+      // Show success or failure card based on the payment result
+      if (error) {
+        failureCard.classList.remove('hidden');
+      } else if (paymentIntent) {
+        successCard.classList.remove('hidden');
+      }
+    });
+  </script>
+</body>
+</html>
